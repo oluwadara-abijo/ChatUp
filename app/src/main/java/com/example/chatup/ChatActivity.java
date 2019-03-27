@@ -15,27 +15,30 @@ import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
 
-public class MainActivity extends AppCompatActivity {
+public class ChatActivity extends AppCompatActivity {
 
+    private static final String LOG_TAG = ChatActivity.class.getSimpleName();
+
+    //The string used as MQQT topic and user Id
+    public static final String MQTT_TOPIC = "chat/up";
+
+    //UI elements
     TextView sentMessageTextView;
     TextView receivedMessageTextView;
-    EditText userIdInput;
     EditText messageInput;
     Button sendButton;
 
-    private static final String LOG_TAG = MainActivity.class.getSimpleName();
-
     private MqttAndroidClient mqttClient;
+
     private String messageToSend;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_main);
+        setContentView(R.layout.activity_chat);
 
         sentMessageTextView = findViewById(R.id.tv_messageSent);
         receivedMessageTextView = findViewById(R.id.tv_messageReceived);
-        userIdInput = findViewById(R.id.editText_userId);
         messageInput = findViewById(R.id.editText_messageInput);
         sendButton = findViewById(R.id.button_send);
 
@@ -50,13 +53,12 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendMessage () {
         messageToSend = messageInput.getText().toString();
-        String topic = userIdInput.getText().toString();
         //Initialize Mqtt client
-        initializeClient(topic, messageToSend);
+        initializeClient(messageToSend);
         messageInput.setText("");
     }
 
-    private void initializeClient(final String topic, final String message) {
+    private void initializeClient(final String message) {
         String clientId = MqttClient.generateClientId();
         mqttClient = new MqttAndroidClient(getApplicationContext(),
                 "tcp://broker.hivemq.com:1883", clientId);
@@ -68,8 +70,8 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     Log.d(LOG_TAG, "onSuccess");
-                    publishMessage(topic, message, mqttClient);
-                    subscribeToTopic(mqttClient, topic);
+                    publishMessage(message, mqttClient);
+                    subscribeToTopic(mqttClient);
                 }
 
                 @Override
@@ -85,15 +87,14 @@ public class MainActivity extends AppCompatActivity {
 
     /**
      * Publish a message
-     * @param topic The MQTT topic
      * @param message Message to publish
      * @param mqttClient MQQT client
      */
-    private void publishMessage(String topic, String message, MqttAndroidClient mqttClient) {
+    private void publishMessage(String message, MqttAndroidClient mqttClient) {
         //Publish message
         MqttMessage mqttMessage = new MqttMessage(message.getBytes());
         try {
-            mqttClient.publish(topic, mqttMessage);
+            mqttClient.publish(ChatActivity.MQTT_TOPIC, mqttMessage);
             sentMessageTextView.setText(mqttMessage.toString());
         } catch (MqttException e) {
             e.printStackTrace();
@@ -103,11 +104,11 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Subscribe to a topic
      * @param mqttClient The MQTT client
-     * @param topic The MQTT topic
+     *
      */
-    private void subscribeToTopic(MqttAndroidClient mqttClient, String topic) {
+    private void subscribeToTopic(MqttAndroidClient mqttClient) {
         try {
-            IMqttToken subscriptionToken = mqttClient.subscribe(topic, 1);
+            IMqttToken subscriptionToken = mqttClient.subscribe(ChatActivity.MQTT_TOPIC, 1);
             subscriptionToken.setActionCallback(new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
