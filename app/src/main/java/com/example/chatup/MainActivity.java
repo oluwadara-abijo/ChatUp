@@ -3,6 +3,9 @@ package com.example.chatup;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.util.Log;
+import android.view.View;
+import android.widget.Button;
+import android.widget.EditText;
 import android.widget.TextView;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
@@ -14,28 +17,48 @@ import org.eclipse.paho.client.mqttv3.MqttMessage;
 
 public class MainActivity extends AppCompatActivity {
 
-    TextView messageTextView;
+    TextView sentMessageTextView;
+    TextView receivedMessageTextView;
+    EditText userIdInput;
+    EditText messageInput;
+    Button sendButton;
 
     private static final String LOG_TAG = MainActivity.class.getSimpleName();
+
+    private MqttAndroidClient mqttClient;
+    private String messageToSend;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
-        messageTextView = findViewById(R.id.tv_message);
+        sentMessageTextView = findViewById(R.id.tv_messageSent);
+        receivedMessageTextView = findViewById(R.id.tv_messageReceived);
+        userIdInput = findViewById(R.id.editText_userId);
+        messageInput = findViewById(R.id.editText_messageInput);
+        sendButton = findViewById(R.id.button_send);
 
-        final String topic = "chat_up";
-        final String payload = "chat_payload";
-
-        //Initialize Mqtt client
-        initializeClient(topic, payload);
+        sendButton.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                sendMessage();
+            }
+        });
 
     }
 
-    private void initializeClient(final String topic, final String payload) {
+    private void sendMessage () {
+        messageToSend = messageInput.getText().toString();
+        String topic = userIdInput.getText().toString();
+        //Initialize Mqtt client
+        initializeClient(topic, messageToSend);
+        messageInput.setText("");
+    }
+
+    private void initializeClient(final String topic, final String message) {
         String clientId = MqttClient.generateClientId();
-        final MqttAndroidClient mqttClient = new MqttAndroidClient(getApplicationContext(),
+        mqttClient = new MqttAndroidClient(getApplicationContext(),
                 "tcp://broker.hivemq.com:1883", clientId);
 
         //Connect to client
@@ -45,7 +68,7 @@ public class MainActivity extends AppCompatActivity {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     Log.d(LOG_TAG, "onSuccess");
-                    publishMessage(topic, payload, mqttClient);
+                    publishMessage(topic, message, mqttClient);
                     subscribeToTopic(mqttClient, topic);
                 }
 
@@ -63,15 +86,15 @@ public class MainActivity extends AppCompatActivity {
     /**
      * Publish a message
      * @param topic The MQTT topic
-     * @param payload Payload used to publish
+     * @param message Message to publish
      * @param mqttClient MQQT client
      */
-    private void publishMessage(String topic, String payload, MqttAndroidClient mqttClient) {
+    private void publishMessage(String topic, String message, MqttAndroidClient mqttClient) {
         //Publish message
-        MqttMessage message = new MqttMessage(payload.getBytes());
+        MqttMessage mqttMessage = new MqttMessage(message.getBytes());
         try {
-            mqttClient.publish(topic, message);
-            messageTextView.setText(message.toString());
+            mqttClient.publish(topic, mqttMessage);
+            sentMessageTextView.setText(mqttMessage.toString());
         } catch (MqttException e) {
             e.printStackTrace();
         }
@@ -88,7 +111,8 @@ public class MainActivity extends AppCompatActivity {
             subscriptionToken.setActionCallback(new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
-                    Log.d(LOG_TAG, "Message was published");
+                    Log.d(LOG_TAG, "Subscription successful");
+                    receivedMessageTextView.setText(messageToSend);
                 }
 
                 @Override
