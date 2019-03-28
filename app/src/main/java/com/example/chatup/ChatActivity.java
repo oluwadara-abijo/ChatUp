@@ -6,6 +6,7 @@ import android.util.Log;
 import android.view.View;
 import android.widget.Button;
 import android.widget.EditText;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import org.eclipse.paho.android.service.MqttAndroidClient;
@@ -14,6 +15,9 @@ import org.eclipse.paho.client.mqttv3.IMqttToken;
 import org.eclipse.paho.client.mqttv3.MqttClient;
 import org.eclipse.paho.client.mqttv3.MqttException;
 import org.eclipse.paho.client.mqttv3.MqttMessage;
+
+import java.util.ArrayList;
+import java.util.List;
 
 public class ChatActivity extends AppCompatActivity {
 
@@ -27,9 +31,13 @@ public class ChatActivity extends AppCompatActivity {
     TextView receivedMessageTextView;
     EditText messageInput;
     Button sendButton;
+    ListView listView;
+
+    private MessageAdapter mMessageAdapter;
 
     private MqttAndroidClient mqttClient;
 
+    private boolean isPublished;
     private String messageToSend;
 
     @Override
@@ -41,6 +49,12 @@ public class ChatActivity extends AppCompatActivity {
         receivedMessageTextView = findViewById(R.id.tv_messageReceived);
         messageInput = findViewById(R.id.editText_messageInput);
         sendButton = findViewById(R.id.button_send);
+        listView = findViewById(R.id.messages_listView);
+
+        // Initialize message ListView and its adapter
+        List<Message> messages = new ArrayList<>();
+        mMessageAdapter = new MessageAdapter(this, R.layout.item_published_message, messages);
+        listView.setAdapter(mMessageAdapter);
 
         sendButton.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -51,8 +65,8 @@ public class ChatActivity extends AppCompatActivity {
 
     }
 
-    private void sendMessage () {
-        messageToSend = messageInput.getText().toString();
+    private void sendMessage() {
+        String messageToSend = messageInput.getText().toString();
         //Initialize Mqtt client
         initializeClient(messageToSend);
         messageInput.setText("");
@@ -92,10 +106,13 @@ public class ChatActivity extends AppCompatActivity {
      */
     private void publishMessage(String message, MqttAndroidClient mqttClient) {
         //Publish message
+        isPublished = true;
         MqttMessage mqttMessage = new MqttMessage(message.getBytes());
         try {
             mqttClient.publish(ChatActivity.MQTT_TOPIC, mqttMessage);
-            sentMessageTextView.setText(mqttMessage.toString());
+            messageToSend = mqttMessage.toString();
+            Message myMessage = new Message(messageToSend, isPublished);
+            mMessageAdapter.add(myMessage);
         } catch (MqttException e) {
             e.printStackTrace();
         }
@@ -108,12 +125,15 @@ public class ChatActivity extends AppCompatActivity {
      */
     private void subscribeToTopic(MqttAndroidClient mqttClient) {
         try {
-            IMqttToken subscriptionToken = mqttClient.subscribe(ChatActivity.MQTT_TOPIC, 1);
+            isPublished = false;
+            final IMqttToken subscriptionToken = mqttClient.subscribe(ChatActivity.MQTT_TOPIC, 1);
             subscriptionToken.setActionCallback(new IMqttActionListener() {
                 @Override
                 public void onSuccess(IMqttToken asyncActionToken) {
                     Log.d(LOG_TAG, "Subscription successful");
-                    receivedMessageTextView.setText(messageToSend);
+                    Message message = new Message(messageToSend, isPublished);
+                    mMessageAdapter.add(message);
+
                 }
 
                 @Override
